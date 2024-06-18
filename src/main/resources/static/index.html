@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic Tac Toe</title>
+    <style>
+        #game-board {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            grid-template-rows: repeat(3, 100px);
+            gap: 5px;
+            justify-content: center;
+        }
+        .cell {
+            width: 100px;
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2em;
+            background-color: #eee;
+            cursor: pointer;
+        }
+        .cell.disabled {
+            pointer-events: none;
+            background-color: #ccc;
+        }
+        .winning-cell {
+            background-color: green;
+            color: white;
+        }
+        #status {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 1.5em;
+        }
+    </style>
+</head>
+<body>
+    <h1>Tic Tac Toe</h1>
+    <div id="game-board"></div>
+    <div id="status">Loading...</div>
+    <button id="reset-button">Reset Game</button>
+
+    <script>
+        const boardElement = document.getElementById('game-board');
+        const statusElement = document.getElementById('status');
+        const resetButton = document.getElementById('reset-button');
+
+        function createBoard() {
+            boardElement.innerHTML = '';
+            for (let i = 0; i < 9; i++) {
+                const cell = document.createElement('div');
+                cell.classList.add('cell');
+                cell.addEventListener('click', () => makeMove(i));
+                boardElement.appendChild(cell);
+            }
+        }
+
+        function updateBoard(board) {
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach((cell, index) => {
+                cell.textContent = board[index];
+                cell.classList.toggle('disabled', board[index] !== '');
+            });
+        }
+
+        function setStatus(message) {
+            statusElement.textContent = message;
+        }
+
+        async function getBoard() {
+            const response = await fetch('/api/tictactoe/board');
+            const board = await response.json();
+            updateBoard(board);
+        }
+
+        async function getCurrentPlayer() {
+            const response = await fetch('/api/tictactoe/currentPlayer');
+            const player = await response.text();
+            setStatus(`${player}'s turn`);
+        }
+
+        async function makeMove(index) {
+            const response = await fetch(`/api/tictactoe/move/${index}`, { method: 'POST' });
+            const result = await response.text();
+            await getBoard();
+            if (result.startsWith("Next move")) {
+                await getCurrentPlayer();
+            } else {
+                const [message, winningCombination] = result.split("-");
+                setStatus(message);
+                if (winningCombination) {
+                    highlightWinningCombination(winningCombination.split(","));
+                }
+                disableBoard();
+            }
+        }
+
+        function highlightWinningCombination(indices) {
+            indices.forEach(index => {
+                document.querySelectorAll('.cell')[index].classList.add('winning-cell');
+            });
+        }
+
+        function disableBoard() {
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach(cell => cell.classList.add('disabled'));
+        }
+
+        async function resetGame() {
+            await fetch('/api/tictactoe/reset', { method: 'POST' });
+            createBoard();
+            await getBoard();
+            await getCurrentPlayer();
+            setStatus("Game reset. X's turn");
+        }
+
+        resetButton.addEventListener('click', resetGame);
+
+        createBoard();
+        getBoard();
+        getCurrentPlayer();
+    </script>
+</body>
+</html>
